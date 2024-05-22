@@ -12,19 +12,19 @@ type WalletRepository struct {
 	DB *sql.DB
 }
 
-func (repo *WalletRepository) GetWalletByUserID(ctx context.Context, userID int) (*models.Wallet, error) {
-	// SQL query to fetch wallet data for the given user ID
-	query := `SELECT user_id, usd, cryptocurrencies FROM wallets WHERE user_id = $1`
+func NewWalletRepository(db *sql.DB) *WalletRepository {
+	return &WalletRepository{DB: db}
+}
 
-	// Execute the query
+func (repo *WalletRepository) GetWalletByUserID(ctx context.Context, userID int) (*models.Wallet, error) {
+	query := "SELECT user_id, usd, cryptocurrencies FROM wallets WHERE user_id = $1"
+
 	row := repo.DB.QueryRowContext(ctx, query, userID)
 
-	// Initialize variables to store the retrieved data
 	var wallet models.Wallet
 	var usd float64
 	var cryptocurrenciesJSON []byte
 
-	// Scan the row to extract data into variables
 	err := row.Scan(&wallet.UserID, &usd, &cryptocurrenciesJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -33,13 +33,11 @@ func (repo *WalletRepository) GetWalletByUserID(ctx context.Context, userID int)
 		return nil, err
 	}
 
-	// Unmarshal cryptocurrencies JSON into a map
 	var cryptocurrencies map[string]float64
 	if err := json.Unmarshal(cryptocurrenciesJSON, &cryptocurrencies); err != nil {
 		return nil, err
 	}
 
-	// Assign retrieved data to the wallet struct
 	wallet.USD = usd
 	wallet.Cryptocurrencies = cryptocurrencies
 
@@ -47,34 +45,65 @@ func (repo *WalletRepository) GetWalletByUserID(ctx context.Context, userID int)
 }
 
 func (repo *WalletRepository) Deposit(ctx context.Context, userID int, amount float64) error {
-	// Start a transaction
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		// Rollback the transaction if an error occurs
 		if r := recover(); r != nil {
 			tx.Rollback()
 		}
 	}()
 
-	// SQL query to update wallet balance
 	query := `
-        UPDATE wallets 
-        SET usd = usd + $1 
+        UPDATE wallets
+        SET usd = usd + $1
         WHERE user_id = $2
     `
 
-	// Execute the query
 	_, err = tx.ExecContext(ctx, query, amount, userID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (repo *WalletRepository) UpdateWallet(ctx context.Context, wallet *models.Wallet) error {
+	tx, err := repo.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	cryptocurrenciesJSON, err := json.Marshal(wallet.Cryptocurrencies)
+	if err != nil {
+		return err
+	}
+
+	query := `
+        UPDATE wallets
+        SET usd = $1, cryptocurrencies = $2
+        WHERE user_id = $3
+    `
+
+	_, err = tx.ExecContext(ctx, query, wallet.USD, cryptocurrenciesJSON, wallet.UserID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return err
 	}

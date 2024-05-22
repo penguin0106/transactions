@@ -21,3 +21,13 @@ func (service *WalletService) GetWalletByUserID(ctx context.Context, userID int)
 func (service *WalletService) Deposit(ctx context.Context, userID int, amount float64) error {
 	return service.repo.Deposit(ctx, userID, amount)
 }
+
+func (service *WalletService) UpdateBalance(ctx context.Context, userID int, amount float64) error {
+	wallet, err := service.repo.GetWalletByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	wallet.USD += amount
+	return service.repo.UpdateWallet(ctx, wallet)
+}

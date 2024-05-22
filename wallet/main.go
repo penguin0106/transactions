@@ -1,4 +1,4 @@
-package wallet
+package main
 
 import (
 	"database/sql"
@@ -19,12 +19,13 @@ func main() {
 	}
 
 	// Repository and Service setup
-	walletRepo := &repositories.WalletRepository{DB: db}
+	walletRepo := repositories.NewWalletRepository(db)
 	walletService := services.NewWalletService(walletRepo)
 
 	// Handlers setup
-	http.HandleFunc("/balance", handlers.BalanceHandler(walletService))
+	http.HandleFunc("/get_balance", handlers.BalanceHandler(walletService))
 	http.HandleFunc("/deposit", handlers.DepositHandler(walletService))
+	http.HandleFunc("/update_balance", handlers.UpdateBalanceHandler(walletService))
 
 	// Start HTTP server
 	log.Fatal(http.ListenAndServe(":8080", nil))
