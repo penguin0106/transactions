@@ -81,3 +81,62 @@ func PurchaseOrderHandler(service *services.OrderService) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	}
 }
+
+// DeleteOrderHandler handles the request for deleting an order.
+func DeleteOrderHandler(service *services.OrderService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		orderIDStr := r.URL.Query().Get("order_id")
+		orderID, err := strconv.Atoi(orderIDStr)
+		if err != nil {
+			http.Error(w, "Invalid order ID", http.StatusBadRequest)
+			return
+		}
+
+		err = service.DeleteOrder(r.Context(), orderID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	}
+}
+
+// FindOrdersBySellerUsernameHandler handles the request for finding orders by seller's username.
+func FindOrdersBySellerUsernameHandler(service *services.OrderService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := r.URL.Query().Get("username")
+		if username == "" {
+			http.Error(w, "Username is required", http.StatusBadRequest)
+			return
+		}
+
+		orders, err := service.FindOrdersBySellerUsername(r.Context(), username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(orders)
+	}
+}
+
+// FindOrdersByCryptocurrencyHandler handles the request for finding orders by cryptocurrency.
+func FindOrdersByCryptocurrencyHandler(service *services.OrderService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cryptocurrency := r.URL.Query().Get("cryptocurrency")
+		if cryptocurrency == "" {
+			http.Error(w, "Cryptocurrency is required", http.StatusBadRequest)
+			return
+		}
+
+		orders, err := service.FindOrdersByCryptocurrency(r.Context(), cryptocurrency)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(orders)
+	}
+}

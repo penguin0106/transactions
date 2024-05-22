@@ -71,3 +71,15 @@ func (service *OrderService) PurchaseOrder(ctx context.Context, buyerID, orderID
 	order.Status = "COMPLETED"
 	return service.repo.UpdateOrder(ctx, order)
 }
+
+func (service *OrderService) DeleteOrder(ctx context.Context, orderID int) error {
+	return service.repo.DeleteOrder(ctx, orderID)
+}
+
+func (service *OrderService) FindOrdersBySellerUsername(ctx context.Context, username string) ([]*models.Order, error) {
+	return service.repo.FindOrdersBySellerUsername(ctx, username)
+}
+
+func (service *OrderService) FindOrdersByCryptocurrency(ctx context.Context, cryptocurrency string) ([]*models.Order, error) {
+	return service.repo.FindOrdersByCryptocurrency(ctx, cryptocurrency)
+}

@@ -28,6 +28,9 @@ func main() {
 	http.HandleFunc("/create_order", handlers.CreateOrderHandler(orderService))
 	http.HandleFunc("/get_order", handlers.GetOrderHandler(orderService))
 	http.HandleFunc("/purchase_order", handlers.PurchaseOrderHandler(orderService))
+	http.HandleFunc("/delete_order", handlers.DeleteOrderHandler(orderService))
+	http.HandleFunc("/find_orders_by_seller", handlers.FindOrdersBySellerUsernameHandler(orderService))
+	http.HandleFunc("/find_orders_by_cryptocurrency", handlers.FindOrdersByCryptocurrencyHandler(orderService))
 
 	// Start HTTP server
 	log.Fatal(http.ListenAndServe(":8081", nil))

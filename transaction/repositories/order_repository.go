@@ -63,3 +63,56 @@ func (repo *OrderRepository) UpdateOrder(ctx context.Context, order *models.Orde
 	_, err := repo.DB.ExecContext(ctx, query, order.BuyerID, order.Status, order.ID)
 	return err
 }
+
+func (repo *OrderRepository) DeleteOrder(ctx context.Context, orderID int) error {
+	query := "DELETE FROM orders WHERE id = $1"
+	_, err := repo.DB.ExecContext(ctx, query, orderID)
+	return err
+}
+
+func (repo *OrderRepository) FindOrdersBySellerUsername(ctx context.Context, username string) ([]*models.Order, error) {
+	query := `
+        SELECT o.id, o.seller_id, o.buyer_id, o.cryptocurrency, o.amount, o.desired_currency, o.status, o.created_at
+        FROM orders o
+        JOIN users u ON o.seller_id = u.id
+        WHERE u.username = $1
+    `
+	rows, err := repo.DB.QueryContext(ctx, query, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		var order models.Order
+		if err := rows.Scan(&order.ID, &order.SellerID, &order.BuyerID, &order.Cryptocurrency, &order.Amount, &order.DesiredCurrency, &order.Status, &order.CreatedAt); err != nil {
+			return nil, err
+		}
+		orders = append(orders, &order)
+	}
+	return orders, nil
+}
+
+func (repo *OrderRepository) FindOrdersByCryptocurrency(ctx context.Context, cryptocurrency string) ([]*models.Order, error) {
+	query := `
+        SELECT id, seller_id, buyer_id, cryptocurrency, amount, desired_currency, status, created_at
+        FROM orders
+        WHERE cryptocurrency = $1
+    `
+	rows, err := repo.DB.QueryContext(ctx, query, cryptocurrency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		var order models.Order
+		if err := rows.Scan(&order.ID, &order.SellerID, &order.BuyerID, &order.Cryptocurrency, &order.Amount, &order.DesiredCurrency, &order.Status, &order.CreatedAt); err != nil {
+			return nil, err
+		}
+		orders = append(orders, &order)
+	}
+	return orders, nil
+}
