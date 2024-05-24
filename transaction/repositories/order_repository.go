@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"transaction/models"
 )
 
@@ -25,9 +24,9 @@ func (repo *OrderRepository) CreateOrder(ctx context.Context, order *models.Orde
 	return orderID, nil
 }
 
-func (repo *OrderRepository) GetOrdersBySellerUsername(ctx context.Context, username string) ([]*models.Order, error) {
-	query := "SELECT id, seller_id, cryptocurrency, amount, price, status, exchange_to FROM orders WHERE seller_id IN (SELECT id FROM users WHERE username = $1)"
-	rows, err := repo.DB.QueryContext(ctx, query, username)
+func (repo *OrderRepository) GetOrders(ctx context.Context) ([]*models.Order, error) {
+	query := "SELECT id, seller_id, cryptocurrency, amount, price, status, exchange_to FROM orders"
+	rows, err := repo.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -67,28 +66,33 @@ func (repo *OrderRepository) GetOrdersByCurrency(ctx context.Context, currency s
 	return orders, nil
 }
 
-func (repo *OrderRepository) PurchaseOrder(ctx context.Context, buyerID, orderID int) error {
-	order, err := repo.GetOrderByID(ctx, orderID)
+func (repo *OrderRepository) GetOrdersBySellerUsername(ctx context.Context, username string) ([]*models.Order, error) {
+	query := "SELECT id, seller_id, cryptocurrency, amount, price, status, exchange_to FROM orders WHERE seller_id IN (SELECT id FROM users WHERE username = $1)"
+	rows, err := repo.DB.QueryContext(ctx, query, username)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		var order models.Order
+		err := rows.Scan(&order.ID, &order.SellerID, &order.Cryptocurrency, &order.Amount, &order.Price, &order.Status, &order.ExchangeTo)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, &order)
 	}
 
-	if order.Status != "PENDING" {
-		return errors.New("order is not available for purchase")
-	}
-
-	order.BuyerID = buyerID
-	order.Status = "COMPLETED"
-
-	return repo.UpdateOrder(ctx, order)
+	return orders, nil
 }
 
 func (repo *OrderRepository) GetOrderByID(ctx context.Context, orderID int) (*models.Order, error) {
-	query := "SELECT seller_id, buyer_id, cryptocurrency, amount, price, status, exchange_to FROM orders WHERE id = $1"
+	query := "SELECT id, seller_id, cryptocurrency, amount, price, status, exchange_to FROM orders WHERE id = $1"
 	row := repo.DB.QueryRowContext(ctx, query, orderID)
 
 	var order models.Order
-	err := row.Scan(&order.SellerID, &order.BuyerID, &order.Cryptocurrency, &order.Amount, &order.Price, &order.Status, &order.ExchangeTo)
+	err := row.Scan(&order.ID, &order.SellerID, &order.Cryptocurrency, &order.Amount, &order.Price, &order.Status, &order.ExchangeTo)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -96,12 +100,11 @@ func (repo *OrderRepository) GetOrderByID(ctx context.Context, orderID int) (*mo
 		return nil, err
 	}
 
-	order.ID = orderID
 	return &order, nil
 }
 
 func (repo *OrderRepository) UpdateOrder(ctx context.Context, order *models.Order) error {
-	query := "UPDATE orders SET seller_id = $1, buyer_id = $2, cryptocurrency = $3, amount = $4, price = $5, status = $6, exchange_to = $7 WHERE id = $8"
-	_, err := repo.DB.ExecContext(ctx, query, order.SellerID, order.BuyerID, order.Cryptocurrency, order.Amount, order.Price, order.Status, order.ExchangeTo, order.ID)
+	query := "UPDATE orders SET status = $1 WHERE id = $2"
+	_, err := repo.DB.ExecContext(ctx, query, order.Status, order.ID)
 	return err
 }
