@@ -20,12 +20,13 @@ func main() {
 
 	// Repository and Service setup
 	walletRepo := repositories.NewWalletRepository(db)
-	walletService := services.NewWalletService(walletRepo)
+	accountRepo := repositories.NewAccountRepository(db)
+	walletService := services.NewWalletService(walletRepo, accountRepo)
 
 	// Handlers setup
 	http.HandleFunc("/get_balance", handlers.BalanceHandler(walletService))
-	http.HandleFunc("/deposit", handlers.DepositHandler(walletService))
 	http.HandleFunc("/update_balance", handlers.UpdateBalanceHandler(walletService))
+	http.HandleFunc("/create_purse", handlers.CreateAccountHandler(walletService))
 
 	// Start HTTP server
 	log.Fatal(http.ListenAndServe(":8080", nil))

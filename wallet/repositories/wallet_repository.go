@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"wallet/models"
 )
 
@@ -17,34 +16,62 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 }
 
 func (repo *WalletRepository) GetWalletByUserID(ctx context.Context, userID int) (*models.Wallet, error) {
-	query := "SELECT user_id, usd, cryptocurrencies FROM wallets WHERE user_id = $1"
+	query := "SELECT accounts FROM wallets WHERE user_id = $1"
 
-	row := repo.DB.QueryRowContext(ctx, query, userID)
-
-	var wallet models.Wallet
-	var usd float64
-	var cryptocurrenciesJSON []byte
-
-	err := row.Scan(&wallet.UserID, &usd, &cryptocurrenciesJSON)
+	var accountsJSON []byte
+	err := repo.DB.QueryRowContext(ctx, query, userID).Scan(&accountsJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.New("wallet not found for the user")
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	var cryptocurrencies map[string]float64
-	if err := json.Unmarshal(cryptocurrenciesJSON, &cryptocurrencies); err != nil {
+	var accounts []string
+	if err := json.Unmarshal(accountsJSON, &accounts); err != nil {
 		return nil, err
 	}
 
-	wallet.USD = usd
-	wallet.Cryptocurrencies = cryptocurrencies
-
-	return &wallet, nil
+	return &models.Wallet{
+		UserID:   userID,
+		Accounts: accounts,
+	}, nil
 }
 
-func (repo *WalletRepository) Deposit(ctx context.Context, userID int, amount float64) error {
+func (repo *WalletRepository) CreateWallet(ctx context.Context, userID int, usdAccount string) error {
+	accounts := []string{usdAccount}
+	accountsJson, err := json.Marshal(accounts)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO wallets (user_id, accounts) VALUES ($1, $2)"
+	_, err = repo.DB.ExecContext(ctx, query, userID, accountsJson)
+	return err
+}
+
+func (repo *WalletRepository) AddAccountToWallet(ctx context.Context, userID int, accountNumber string) error {
+	wallet, err := repo.GetWalletByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if wallet == nil {
+		return sql.ErrNoRows
+	}
+
+	wallet.Accounts = append(wallet.Accounts, accountNumber)
+	accountsJSON, err := json.Marshal(wallet.Accounts)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE wallets SET accounts = $1 WHERE user_id = $2"
+	_, err = repo.DB.ExecContext(ctx, query, accountsJSON, userID)
+	return err
+}
+
+func (repo *WalletRepository) Deposit(ctx context.Context, accountNumber string, amount float64) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -57,12 +84,12 @@ func (repo *WalletRepository) Deposit(ctx context.Context, userID int, amount fl
 	}()
 
 	query := `
-        UPDATE wallets
-        SET usd = usd + $1
-        WHERE user_id = $2
-    `
+			UPDATE accounts
+			SET balance = balance + $1
+			WHERE account_number = $2
+	`
 
-	_, err = tx.ExecContext(ctx, query, amount, userID)
+	_, err = tx.ExecContext(ctx, query, amount, accountNumber)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -87,18 +114,18 @@ func (repo *WalletRepository) UpdateWallet(ctx context.Context, wallet *models.W
 		}
 	}()
 
-	cryptocurrenciesJSON, err := json.Marshal(wallet.Cryptocurrencies)
+	accountsJSON, err := json.Marshal(wallet.Accounts)
 	if err != nil {
 		return err
 	}
 
 	query := `
-        UPDATE wallets
-        SET usd = $1, cryptocurrencies = $2
-        WHERE user_id = $3
-    `
+			UPDATE wallets
+			SET accounts = $1
+			WHERE user_id = $2
+	`
 
-	_, err = tx.ExecContext(ctx, query, wallet.USD, cryptocurrenciesJSON, wallet.UserID)
+	_, err = tx.ExecContext(ctx, query, accountsJSON, wallet.UserID)
 	if err != nil {
 		tx.Rollback()
 		return err

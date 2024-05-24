@@ -17,15 +17,15 @@ func NewWalletClient(baseURL string) *WalletClient {
 }
 
 type UpdateBalanceRequest struct {
-	UserID int     `json:"user_id"`
-	Amount float64 `json:"amount"`
+	AccountNumber string  `json:"account_number"`
+	Amount        float64 `json:"amount"`
 }
 
-func (client *WalletClient) UpdateBalance(ctx context.Context, userID int, amount float64) error {
+func (client *WalletClient) UpdateBalance(ctx context.Context, accountNumber string, amount float64) error {
 	url := fmt.Sprintf("%s/update_balance", client.BaseURL)
 	reqBody := UpdateBalanceRequest{
-		UserID: userID,
-		Amount: amount,
+		AccountNumber: accountNumber,
+		Amount:        amount,
 	}
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {

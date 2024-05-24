@@ -8,41 +8,38 @@ import (
 	"wallet/services"
 )
 
+type CreateAccountRequest struct {
+	UserID   int    `json:"user_id"`
+	Currency string `json:"currency"`
+}
+
 // BalanceHandler handles the request for getting the wallet balance of a user.
 func BalanceHandler(service *services.WalletService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract user ID from query parameters
-		userIDStr := r.URL.Query().Get("user_id")
-		if userIDStr == "" {
-			http.Error(w, "Missing user ID", http.StatusBadRequest)
+		userID := r.URL.Query().Get("user_id")
+		if userID == "" {
+			http.Error(w, "user_id is required", http.StatusBadRequest)
 			return
 		}
 
-		userID, err := strconv.Atoi(userIDStr)
+		id, err := strconv.Atoi(userID)
 		if err != nil {
-			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			http.Error(w, "invalid user_id", http.StatusBadRequest)
 			return
 		}
 
-		// Get the wallet balance using the service
-		wallet, err := service.GetWalletByUserID(r.Context(), userID)
+		wallet, err := service.GetWalletByUserId(context.Background(), id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		// Encode the wallet balance to JSON and write it to the response
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(wallet); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		json.NewEncoder(w).Encode(wallet)
 	}
 }
 
 type UpdateBalanceRequest struct {
-	UserID int     `json:"user_id"`
-	Amount float64 `json:"amount"`
+	AccountNumber string  `json:"account_number"`
+	Amount        float64 `json:"amount"`
 }
 
 func UpdateBalanceHandler(walletService *services.WalletService) http.HandlerFunc {
@@ -54,13 +51,32 @@ func UpdateBalanceHandler(walletService *services.WalletService) http.HandlerFun
 			return
 		}
 
-		err = walletService.UpdateBalance(context.Background(), req.UserID, req.Amount)
+		err = walletService.Deposit(context.Background(), req.AccountNumber, req.Amount)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	}
+}
+
+func CreateAccountHandler(walletService *services.WalletService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req CreateAccountRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		account, err := walletService.CreateAccount(context.Background(), req.UserID, req.Currency)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+		json.NewEncoder(w).Encode(account)
 	}
 }

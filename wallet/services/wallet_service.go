@@ -7,27 +7,43 @@ import (
 )
 
 type WalletService struct {
-	repo *repositories.WalletRepository
+	walletRepo  *repositories.WalletRepository
+	accountRepo *repositories.AccountRepository
 }
 
-func NewWalletService(repo *repositories.WalletRepository) *WalletService {
-	return &WalletService{repo: repo}
+func NewWalletService(walletRepo *repositories.WalletRepository, accountRepo *repositories.AccountRepository) *WalletService {
+	return &WalletService{walletRepo: walletRepo, accountRepo: accountRepo}
 }
 
-func (service *WalletService) GetWalletByUserID(ctx context.Context, userID int) (*models.Wallet, error) {
-	return service.repo.GetWalletByUserID(ctx, userID)
+func (service *WalletService) GetWalletByUserId(ctx context.Context, userID int) (*models.Wallet, error) {
+	return service.walletRepo.GetWalletByUserID(ctx, userID)
 }
 
-func (service *WalletService) Deposit(ctx context.Context, userID int, amount float64) error {
-	return service.repo.Deposit(ctx, userID, amount)
-}
-
-func (service *WalletService) UpdateBalance(ctx context.Context, userID int, amount float64) error {
-	wallet, err := service.repo.GetWalletByUserID(ctx, userID)
+func (service *WalletService) CreateWallet(ctx context.Context, userID int) error {
+	account, err := service.accountRepo.CreateAccount(ctx, "USD")
 	if err != nil {
 		return err
 	}
+	return service.walletRepo.CreateWallet(ctx, userID, account.AccountNumber)
+}
 
-	wallet.USD += amount
-	return service.repo.UpdateWallet(ctx, wallet)
+func (service *WalletService) CreateAccount(ctx context.Context, userID int, currency string) (*models.Account, error) {
+	account, err := service.accountRepo.CreateAccount(ctx, currency)
+	if err != nil {
+		return nil, err
+	}
+
+	err = service.walletRepo.AddAccountToWallet(ctx, userID, account.AccountNumber)
+	if err != nil {
+		return nil, err
+	}
+	return account, nil
+}
+
+func (service *WalletService) UpdateWallet(ctx context.Context, wallet *models.Wallet) error {
+	return service.walletRepo.UpdateWallet(ctx, wallet)
+}
+
+func (service *WalletService) Deposit(ctx context.Context, accountNumber string, amount float64) error {
+	return service.walletRepo.Deposit(ctx, accountNumber, amount)
 }

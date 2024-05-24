@@ -7,9 +7,15 @@ CREATE TABLE users (
 
 CREATE TABLE wallets (
                          user_id INT PRIMARY KEY,
-                         usd NUMERIC(20, 2) NOT NULL DEFAULT 0.00,
-                         cryptocurrencies JSONB NOT NULL DEFAULT '{}'::jsonb,
+                         accounts JSONB NOT NULL,
                          FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE accounts (
+                        id SERIAL PRIMARY KEY,
+                        account_number VARCHAR(32) UNIQUE NOT NULL,
+                        balance NUMERIC(20, 2) NOT NULL DEFAULT 0.00,
+                        active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 
@@ -30,10 +36,7 @@ CREATE TABLE orders (
 -- Insert users
 INSERT INTO users (username) VALUES ('seller1'), ('buyer1');
 
--- Insert wallets
-INSERT INTO wallets (user_id, usd, cryptocurrencies) VALUES
-                                                         (1, 1000.00, '{"BTC": 2.0, "ETH": 10.0}'),
-                                                         (2, 500.00, '{"BTC": 1.0, "ETH": 5.0}');
+
 
 -- Insert orders
 INSERT INTO orders (seller_id, cryptocurrency, amount, desired_currency, status) VALUES
